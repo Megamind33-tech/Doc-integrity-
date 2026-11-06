@@ -107,6 +107,15 @@ fun ReportScreen(report: ForensicReport, onClose: () -> Unit, onComparePages: ((
             }
         }
 
+        item { SectionHeader("Digital signatures", "Cryptographic validity, certificate trust and the truth of the content are three different questions.") }
+        if (report.signatures.isEmpty()) {
+            report.findings.filter { it.area == Area.SIGNATURE }.forEach { f -> item(key = "sig0-" + f.id) { FindingCard(f, startExpanded = true) } }
+        } else {
+            items(report.signatures, key = { "sigres-" + it.objNum }) { SignatureCard(it, report.trust.description) }
+            val sf = report.findings.filter { it.area == Area.SIGNATURE }
+            items(sf, key = { "sigf-" + it.id + it.title }) { FindingCard(it) }
+        }
+
         val tool = report.findings.filter { it.area == Area.CREATION_TOOL || it.area == Area.METADATA }
         if (tool.isNotEmpty()) {
             item { SectionHeader("Creation-tool and metadata evidence", "Self-asserted labels; they can be edited or forged.") }
@@ -122,7 +131,7 @@ fun ReportScreen(report: ForensicReport, onClose: () -> Unit, onComparePages: ((
             item { SectionHeader("Content, fonts and images") }
             items(content, key = { "con-" + it.id + it.title }) { FindingCard(it) }
         }
-        val other = report.findings.filter { it.area !in setOf(Area.CREATION_TOOL, Area.METADATA, Area.REVISIONS, Area.STRUCTURE, Area.CONTENT, Area.FONTS, Area.IMAGE, Area.COMPARISON) }
+        val other = report.findings.filter { it.area !in setOf(Area.CREATION_TOOL, Area.METADATA, Area.REVISIONS, Area.STRUCTURE, Area.CONTENT, Area.FONTS, Area.IMAGE, Area.COMPARISON, Area.SIGNATURE) }
         if (other.isNotEmpty()) {
             item { SectionHeader("Other findings") }
             items(other, key = { "oth-" + it.id + it.title }) { FindingCard(it) }

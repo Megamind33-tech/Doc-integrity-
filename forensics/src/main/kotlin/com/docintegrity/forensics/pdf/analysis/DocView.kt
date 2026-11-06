@@ -19,6 +19,7 @@ enum class ObjectKind(val label: String) {
     FORM_XOBJECT("Form XObject"),
     ANNOTATION("Annotation"),
     FORM_FIELD("Form field"),
+    ACROFORM("Interactive form dictionary"),
     SIGNATURE("Signature"),
     XMP("XMP metadata"),
     INFO("Info dictionary"),
@@ -57,6 +58,7 @@ class DocView(val file: PdfFile, val rev: Int) {
     private val pageTreeNums = HashSet<Int>()
     private val pageNums = HashMap<Int, Int>()
     private val metadataNum: Int? = (catalog?.get("Metadata") as? PdfRef)?.num
+    private val acroFormNum: Int? = (catalog?.get("AcroForm") as? PdfRef)?.num
     private val acroFormFieldNums = HashSet<Int>()
 
     init {
@@ -128,6 +130,7 @@ class DocView(val file: PdfFile, val rev: Int) {
         if (num == catalogNum) return ObjectKind.CATALOG
         if (num == infoNum) return ObjectKind.INFO
         if (num == metadataNum) return ObjectKind.XMP
+        if (num == acroFormNum) return ObjectKind.ACROFORM
         if (num in pageNums) return ObjectKind.PAGE
         if (num in pageTreeNums) return ObjectKind.PAGE_TREE
         if (num in contentOwner) return ObjectKind.CONTENT_STREAM

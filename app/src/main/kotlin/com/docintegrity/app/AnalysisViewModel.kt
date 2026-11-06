@@ -10,6 +10,7 @@ import com.docintegrity.forensics.compare.ReferenceFile
 import com.docintegrity.forensics.compare.ReferenceInput
 import com.docintegrity.forensics.engine.ForensicEngine
 import com.docintegrity.forensics.engine.ForensicReport
+import com.docintegrity.forensics.sig.AndroidTrustAnchors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -78,7 +79,7 @@ class AnalysisViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             try {
                 val ref = s.reference.toInput()
-                val report = withContext(Dispatchers.Default) { ForensicEngine().analyze(s.bytes, s.name, ref, renderer) }
+                val report = withContext(Dispatchers.Default) { ForensicEngine().analyze(s.bytes, s.name, ref, renderer, AndroidTrustAnchors.load()) }
                 _state.value = UiState.Done(report, s.bytes, s.reference.fileBytes)
             } catch (e: Throwable) { _state.value = UiState.Failed(e.message ?: e.javaClass.simpleName) }
         }

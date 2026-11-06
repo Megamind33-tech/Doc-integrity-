@@ -10,6 +10,9 @@ import com.docintegrity.forensics.compare.ComparisonResult
 import com.docintegrity.forensics.compare.PageRenderer
 import com.docintegrity.forensics.compare.ReferenceInput
 import com.docintegrity.forensics.pdf.analysis.MetadataAnalyzer
+import com.docintegrity.forensics.sig.SignatureAnalyzer
+import com.docintegrity.forensics.sig.SignatureResult
+import java.security.cert.X509Certificate
 import com.docintegrity.forensics.pdf.analysis.MetadataResult
 import com.docintegrity.forensics.pdf.analysis.RevisionAnalyzer
 import com.docintegrity.forensics.pdf.analysis.RevisionInfo
@@ -22,6 +25,11 @@ import com.docintegrity.forensics.pdf.raw.PdfFile
 import com.docintegrity.forensics.util.FileHashes
 import com.docintegrity.forensics.util.Hashing
 import java.time.Instant
+
+/** The roots used to judge signer certificates; always named in the report. */
+class TrustSet(val anchors: List<X509Certificate>, val description: String) {
+    companion object { val NONE = TrustSet(emptyList(), "none supplied") }
+}
 
 /** Everything the engine produced for one analysed file. */
 class ForensicReport(
@@ -37,6 +45,8 @@ class ForensicReport(
     val content: DocumentContent?,
     val pageKinds: List<ContentAnalyzer.PageKind>,
     val comparison: ComparisonResult?,
+    val signatures: List<SignatureResult>,
+    val trust: TrustSet,
     val findings: List<Finding>,
     val checksRun: List<String>,
     val verdict: VerdictResult,
@@ -61,6 +71,7 @@ class ForensicEngine(private val now: () -> Instant = { Instant.now() }) {
         fileName: String,
         reference: ReferenceInput? = null,
         renderer: PageRenderer? = null,
+        trust: TrustSet = TrustSet.NONE,
     ): ForensicReport {
         val hashes = Hashing.all(bytes)
         val findings = ArrayList<Finding>()
@@ -79,7 +90,7 @@ class ForensicEngine(private val now: () -> Instant = { Instant.now() }) {
             )
             val cmp0 = ComparisonEngine.compare(bytes, hashes, null, null, reference ?: ReferenceInput(), renderer)
             findings += cmp0.findings
-            return finish(fileName, hashes, false, null, 0, null, emptyList(), null, null, emptyList(), cmp0, findings, checks)
+            return finish(fileName, hashes, false, null, 0, null, emptyList(), null, null, emptyList(), cmp0, emptyList(), trust, findings, checks)
         }
 
         checks += "file fingerprints (SHA-256/512, SHA-1, MD5)"
@@ -113,6 +124,10 @@ class ForensicEngine(private val now: () -> Instant = { Instant.now() }) {
             )
         }
 
+        val sigs = SignatureAnalyzer.analyze(file, rev.revisions, trust.anchors, trust.description, now())
+        findings += sigs.findings
+        checks += "digital signatures (byte ranges, CMS verification, certificate trust, changes after signing)"
+
         val cmp = ComparisonEngine.compare(bytes, hashes, file, content, reference ?: ReferenceInput(), renderer)
         findings += cmp.findings
         checks += if (reference == null || reference.isEmpty) "comparison skipped: no trusted original supplied"
@@ -120,20 +135,21 @@ class ForensicEngine(private val now: () -> Instant = { Instant.now() }) {
             if (reference.hashes.isNotEmpty()) "hash" else null, reference.file?.let { "file" }, if (reference.issuerRecord.isNotEmpty()) "issuer record" else null,
         ).joinToString(", ") + ")"
 
-        return finish(fileName, hashes, true, file.version, structure.pageCount, metadata, rev.revisions, structure, content, kinds, cmp, findings, checks)
+        return finish(fileName, hashes, true, file.version, structure.pageCount, metadata, rev.revisions, structure, content, kinds, cmp, sigs.signatures, trust, findings, checks)
     }
 
     private fun finish(
         fileName: String, hashes: FileHashes, isPdf: Boolean, version: String?, pages: Int,
         metadata: MetadataResult?, revisions: List<RevisionInfo>, structure: StructureResult?,
         content: DocumentContent?, kinds: List<ContentAnalyzer.PageKind>, comparison: ComparisonResult?,
+        signatures: List<SignatureResult>, trust: TrustSet,
         findings: List<Finding>, checks: List<String>,
     ): ForensicReport {
         val ordered = findings.sortedWith(compareBy({ order(it.evidence) }, { it.area.ordinal }))
         val verdict = VerdictEngine.decide(ordered, checks)
         return ForensicReport(
             tool = toolInfo(), fileName = fileName, hashes = hashes, isPdf = isPdf, pdfVersion = version, pageCount = pages,
-            metadata = metadata, revisions = revisions, structure = structure, content = content, pageKinds = kinds, comparison = comparison, findings = ordered, checksRun = checks,
+            metadata = metadata, revisions = revisions, structure = structure, content = content, pageKinds = kinds, comparison = comparison, signatures = signatures, trust = trust, findings = ordered, checksRun = checks,
             verdict = verdict, standingLimitations = VerdictEngine.STANDING_LIMITATIONS,
         )
     }
