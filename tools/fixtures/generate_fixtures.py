@@ -50,7 +50,7 @@ def run(cmd, **kw):
     return r.stdout
 
 
-def photo(path, palette):
+def photo(path, palette, variant=1):
     """Deterministic synthetic 'portrait' (gradient + head + shoulders + noise), saved as JPEG."""
     rnd = random.Random(sum(palette))
     w, h = 160, 200
@@ -61,8 +61,13 @@ def photo(path, palette):
             g = int(60 + 120 * y / h)
             px[x, y] = (g * palette[0] // 255, g * palette[1] // 255, g * palette[2] // 255)
     d = ImageDraw.Draw(im)
-    d.ellipse((50, 30, 110, 105), fill=(210, 170, 140))
-    d.ellipse((15, 110, 145, 260), fill=(40, 50, 90))
+    if variant == 1:
+        d.ellipse((50, 30, 110, 105), fill=(210, 170, 140))
+        d.ellipse((15, 110, 145, 260), fill=(40, 50, 90))
+    else:  # a different person: head higher/larger, narrower shoulders, hair block
+        d.rectangle((38, 12, 128, 62), fill=(30, 25, 20))
+        d.ellipse((38, 24, 128, 122), fill=(190, 140, 110))
+        d.ellipse((40, 128, 120, 260), fill=(110, 40, 40))
     for _ in range(4000):
         x, y = rnd.randrange(w), rnd.randrange(h)
         r, g, b = px[x, y]
@@ -266,7 +271,7 @@ def main():
 
     p1, p2 = os.path.join(work, "photo1.jpg"), os.path.join(work, "photo2.jpg")
     photo(p1, (255, 220, 190))
-    photo(p2, (190, 230, 255))
+    photo(p2, (190, 230, 255), variant=2)
 
     A = os.path.join(out, "A_original.pdf")
     make_original(A, p1)
@@ -280,6 +285,7 @@ def main():
     e_docx = os.path.join(work, "E_native.docx")
     make_docx_native(e_docx)
     shutil.copy(docx_to_pdf(e_docx, os.path.join(work, "E_out")), os.path.join(out, "E_native_docx_export.pdf"))
+    shutil.copy(e_docx, os.path.join(out, "E_source.docx"))   # the authored original, usable as a DOCX reference
 
     F = os.path.join(out, "F_editor_incremental.pdf")
     edit_with_editor(A, F, incremental=True)

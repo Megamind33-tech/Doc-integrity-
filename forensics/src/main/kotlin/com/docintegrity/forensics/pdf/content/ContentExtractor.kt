@@ -10,8 +10,6 @@ import com.tom_roush.pdfbox.pdmodel.PDPage
 import com.tom_roush.pdfbox.pdmodel.font.PDFont
 import com.tom_roush.pdfbox.pdmodel.graphics.blend.BlendMode
 import com.tom_roush.pdfbox.pdmodel.graphics.image.PDImage
-import com.tom_roush.pdfbox.text.PDFTextStripper
-import com.tom_roush.pdfbox.text.TextPosition
 import com.tom_roush.pdfbox.util.Matrix
 import com.tom_roush.pdfbox.util.Vector
 
@@ -40,17 +38,13 @@ object ContentExtractor {
                 val page = it.getPage(i)
                 val geom = Geometry(page)
                 val words = ArrayList<WordInfo>()
-                try {
-                    val stripper = WordCollector(i, words)
-                    stripper.sortByPosition = true
-                    stripper.startPage = i + 1
-                    stripper.endPage = i + 1
-                    stripper.getText(it)
-                } catch (e: Throwable) { errs.add("text extraction failed on page ${i + 1}: ${e.javaClass.simpleName}") }
                 val ops = ArrayList<PaintOp>()
                 try {
                     PaintScanner(page, geom, ops).processPage(page)
                 } catch (e: Throwable) { errs.add("drawing scan failed on page ${i + 1}: ${e.javaClass.simpleName}") }
+                // Words are rebuilt from the painted glyphs. Text hidden under a later opaque shape is not what a
+                // reader sees: it is dropped here (one glyph for one covered glyph) and reported separately.
+                words.addAll(GlyphWords.build(i, ops))
                 pages.add(PageContent(i, geom.width, geom.height, geom.rotation, words, ops, errs))
             }
             return DocumentContent(pages, docErrors, it.isEncrypted)
@@ -82,29 +76,6 @@ object ContentExtractor {
         fun rect(pts: List<Pair<Double, Double>>): RectD {
             val d = pts.map { point(it.first, it.second) }
             return RectD(d.minOf { it.first }, d.minOf { it.second }, d.maxOf { it.first }, d.maxOf { it.second })
-        }
-    }
-
-    private class WordCollector(private val pageIndex: Int, private val sink: MutableList<WordInfo>) : PDFTextStripper() {
-        private var line = 0
-
-        override fun writeLineSeparator() { super.writeLineSeparator(); line++ }
-
-        override fun writeString(text: String, textPositions: MutableList<TextPosition>) {
-            super.writeString(text, textPositions)
-            if (textPositions.isEmpty() || text.isBlank()) return
-            var x0 = Double.MAX_VALUE; var y0 = Double.MAX_VALUE; var x1 = -Double.MAX_VALUE; var y1 = -Double.MAX_VALUE
-            val chars = ArrayList<CharFont>()
-            for (tp in textPositions) {
-                val x = tp.xDirAdj.toDouble()
-                val w = tp.widthDirAdj.toDouble()
-                val h = tp.heightDir.toDouble()
-                val yb = tp.yDirAdj.toDouble()
-                x0 = minOf(x0, x); x1 = maxOf(x1, x + w)
-                y0 = minOf(y0, yb - h); y1 = maxOf(y1, yb)
-                chars.add(CharFont(tp.unicode ?: "", face(tp.font?.name) ?: "?"))
-            }
-            sink.add(WordInfo(pageIndex, line, text.trim(), RectD(x0, y0, x1, y1), textPositions[0].fontSizeInPt, chars))
         }
     }
 
@@ -147,7 +118,7 @@ object ContentExtractor {
             val size = Math.abs(sy)
             val gp = listOf(x to (y - 0.2 * size), (x + adv) to (y + 0.8 * size))
             runPts.addAll(gp)
-            runGlyphs.add(GlyphBox(unicode ?: "", geom.rect(gp)))
+            runGlyphs.add(GlyphBox(unicode ?: "", geom.rect(gp), geom.point(x, y).second))
             runText.append(unicode ?: "")
             runFont = font; runSize = size.toFloat(); runBase = geom.point(x, y).second
         }

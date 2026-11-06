@@ -263,6 +263,24 @@ object ContentAnalyzer {
         return Result(findings, kinds)
     }
 
+    /** Glyph boxes hidden under a later opaque rectangle/image. Shared by the analyser and the text extractor. */
+    fun coveredGlyphs(ops: List<PaintOp>): List<GlyphBox> {
+        val out = ArrayList<GlyphBox>()
+        val coverers = ops.filter { (it is FillOp && it.opaque && it.pureRect) || (it is ImageOp && !it.stencil) }
+        if (coverers.isEmpty()) return out
+        for (t in ops.filterIsInstance<TextOp>()) {
+            if (t.renderMode == 3) continue
+            val later = coverers.filter { it.order > t.order }
+            if (later.isEmpty()) continue
+            for (g in t.glyphs) {
+                // blank glyphs (spaces) hidden under the same cover must go too, or they would split visible words
+                if (g.rect.area <= 0) continue
+                if (later.any { it.rect.intersectionArea(g.rect) / g.rect.area >= COVER_RATIO }) out.add(g)
+            }
+        }
+        return out
+    }
+
     private fun isNearWhite(rgb: Int): Boolean = ((rgb shr 16) and 255) > 240 && ((rgb shr 8) and 255) > 240 && (rgb and 255) > 240
 
     /** True if a non-white opaque shape or image lies beneath [t] (so white text may be a deliberate knock-out). */

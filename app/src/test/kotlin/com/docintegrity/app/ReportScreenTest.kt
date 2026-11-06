@@ -28,7 +28,7 @@ class ReportScreenTest {
 
     @Test fun suspiciousReportShowsCategoryReasonsAndNoCertification() {
         val r = report("F_editor_incremental.pdf")
-        rule.setContent { ForensicsTheme { ReportScreen(r) {} } }
+        rule.setContent { ForensicsTheme { ReportScreen(r, onClose = {}) } }
         rule.onNodeWithText("Suspicious indicators").assertIsDisplayed()
         rule.onNodeWithText("Why this category").assertIsDisplayed()
         rule.onNodeWithText("It does not certify the document as genuine", substring = true).assertIsDisplayed()
@@ -37,7 +37,7 @@ class ReportScreenTest {
 
     @Test fun noIndicatorsReportNeverUsesCertifyingLanguage() {
         val r = report("A_original.pdf")
-        rule.setContent { ForensicsTheme { ReportScreen(r) {} } }
+        rule.setContent { ForensicsTheme { ReportScreen(r, onClose = {}) } }
         rule.onNodeWithText("No indicators detected").assertIsDisplayed()
         rule.onNodeWithText("Authenticity is NOT established", substring = true).assertIsDisplayed()
     }

@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.docintegrity.forensics.engine.ForensicReport
@@ -69,9 +70,9 @@ fun WorkingScreen(message: String) {
 }
 
 @Composable
-fun ReportScreen(report: ForensicReport, onClose: () -> Unit) {
+fun ReportScreen(report: ForensicReport, onClose: () -> Unit, onComparePages: (() -> Unit)? = null) {
     LazyColumn(
-        Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding(),
+        Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().testTag("report"),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -89,6 +90,23 @@ fun ReportScreen(report: ForensicReport, onClose: () -> Unit) {
         item { SectionHeader("Document overview") }
         item { OverviewPanel(report) }
 
+        report.comparison?.takeIf { it.referenceKind != null }?.let { c ->
+            item { SectionHeader("File comparison", "Compared with the trusted reference you supplied") }
+            item { BytesVersusMeaning(c) }
+            if (c.sideBySide != null && c.textHunks.isNotEmpty()) item { SideBySideText(c) }
+            if (onComparePages != null && c.referenceKind in setOf(com.docintegrity.forensics.compare.ReferenceKind.PDF, com.docintegrity.forensics.compare.ReferenceKind.IMAGE)) {
+                item { OutlinedButton(onClick = onComparePages, modifier = Modifier.fillMaxWidth()) { Text("Compare rendered pages side by side") } }
+            }
+            val cmp = report.findings.filter { it.area == Area.COMPARISON }
+            items(cmp, key = { "cmp-" + it.id + it.title }) { FindingCard(it) }
+        }
+        if (report.comparison?.referenceKind == null) {
+            report.findings.firstOrNull { it.id == "CMP_NO_REFERENCE" }?.let { f ->
+                item { SectionHeader("File comparison") }
+                item { FindingCard(f, startExpanded = true) }
+            }
+        }
+
         val tool = report.findings.filter { it.area == Area.CREATION_TOOL || it.area == Area.METADATA }
         if (tool.isNotEmpty()) {
             item { SectionHeader("Creation-tool and metadata evidence", "Self-asserted labels; they can be edited or forged.") }
@@ -104,7 +122,7 @@ fun ReportScreen(report: ForensicReport, onClose: () -> Unit) {
             item { SectionHeader("Content, fonts and images") }
             items(content, key = { "con-" + it.id + it.title }) { FindingCard(it) }
         }
-        val other = report.findings.filter { it.area !in setOf(Area.CREATION_TOOL, Area.METADATA, Area.REVISIONS, Area.STRUCTURE, Area.CONTENT, Area.FONTS, Area.IMAGE) }
+        val other = report.findings.filter { it.area !in setOf(Area.CREATION_TOOL, Area.METADATA, Area.REVISIONS, Area.STRUCTURE, Area.CONTENT, Area.FONTS, Area.IMAGE, Area.COMPARISON) }
         if (other.isNotEmpty()) {
             item { SectionHeader("Other findings") }
             items(other, key = { "oth-" + it.id + it.title }) { FindingCard(it) }

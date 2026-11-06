@@ -37,7 +37,7 @@ class WordInfo(
 
 sealed class PaintOp(val order: Int, val rect: RectD)
 
-class GlyphBox(val ch: String, val rect: RectD)
+class GlyphBox(val ch: String, val rect: RectD, val baseline: Double = rect.y1)
 
 class TextOp(
     order: Int, rect: RectD,

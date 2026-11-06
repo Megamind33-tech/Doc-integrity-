@@ -5,6 +5,10 @@ import com.docintegrity.forensics.model.EvidenceClass
 import com.docintegrity.forensics.model.Finding
 import com.docintegrity.forensics.model.ToolInfo
 import com.docintegrity.forensics.model.VerdictResult
+import com.docintegrity.forensics.compare.ComparisonEngine
+import com.docintegrity.forensics.compare.ComparisonResult
+import com.docintegrity.forensics.compare.PageRenderer
+import com.docintegrity.forensics.compare.ReferenceInput
 import com.docintegrity.forensics.pdf.analysis.MetadataAnalyzer
 import com.docintegrity.forensics.pdf.analysis.MetadataResult
 import com.docintegrity.forensics.pdf.analysis.RevisionAnalyzer
@@ -32,6 +36,7 @@ class ForensicReport(
     val structure: StructureResult?,
     val content: DocumentContent?,
     val pageKinds: List<ContentAnalyzer.PageKind>,
+    val comparison: ComparisonResult?,
     val findings: List<Finding>,
     val checksRun: List<String>,
     val verdict: VerdictResult,
@@ -51,7 +56,12 @@ object EngineInfo {
  */
 class ForensicEngine(private val now: () -> Instant = { Instant.now() }) {
 
-    fun analyze(bytes: ByteArray, fileName: String): ForensicReport {
+    fun analyze(
+        bytes: ByteArray,
+        fileName: String,
+        reference: ReferenceInput? = null,
+        renderer: PageRenderer? = null,
+    ): ForensicReport {
         val hashes = Hashing.all(bytes)
         val findings = ArrayList<Finding>()
         val checks = ArrayList<String>()
@@ -67,7 +77,9 @@ class ForensicEngine(private val now: () -> Instant = { Instant.now() }) {
                     unknown = "Everything about the content. File hashes were still computed.",
                 ),
             )
-            return finish(fileName, hashes, false, null, 0, null, emptyList(), null, null, emptyList(), findings, checks)
+            val cmp0 = ComparisonEngine.compare(bytes, hashes, null, null, reference ?: ReferenceInput(), renderer)
+            findings += cmp0.findings
+            return finish(fileName, hashes, false, null, 0, null, emptyList(), null, null, emptyList(), cmp0, findings, checks)
         }
 
         checks += "file fingerprints (SHA-256/512, SHA-1, MD5)"
@@ -101,20 +113,27 @@ class ForensicEngine(private val now: () -> Instant = { Instant.now() }) {
             )
         }
 
-        return finish(fileName, hashes, true, file.version, structure.pageCount, metadata, rev.revisions, structure, content, kinds, findings, checks)
+        val cmp = ComparisonEngine.compare(bytes, hashes, file, content, reference ?: ReferenceInput(), renderer)
+        findings += cmp.findings
+        checks += if (reference == null || reference.isEmpty) "comparison skipped: no trusted original supplied"
+        else "comparison with the supplied reference (" + listOfNotNull(
+            if (reference.hashes.isNotEmpty()) "hash" else null, reference.file?.let { "file" }, if (reference.issuerRecord.isNotEmpty()) "issuer record" else null,
+        ).joinToString(", ") + ")"
+
+        return finish(fileName, hashes, true, file.version, structure.pageCount, metadata, rev.revisions, structure, content, kinds, cmp, findings, checks)
     }
 
     private fun finish(
         fileName: String, hashes: FileHashes, isPdf: Boolean, version: String?, pages: Int,
         metadata: MetadataResult?, revisions: List<RevisionInfo>, structure: StructureResult?,
-        content: DocumentContent?, kinds: List<ContentAnalyzer.PageKind>,
+        content: DocumentContent?, kinds: List<ContentAnalyzer.PageKind>, comparison: ComparisonResult?,
         findings: List<Finding>, checks: List<String>,
     ): ForensicReport {
         val ordered = findings.sortedWith(compareBy({ order(it.evidence) }, { it.area.ordinal }))
         val verdict = VerdictEngine.decide(ordered, checks)
         return ForensicReport(
             tool = toolInfo(), fileName = fileName, hashes = hashes, isPdf = isPdf, pdfVersion = version, pageCount = pages,
-            metadata = metadata, revisions = revisions, structure = structure, content = content, pageKinds = kinds, findings = ordered, checksRun = checks,
+            metadata = metadata, revisions = revisions, structure = structure, content = content, pageKinds = kinds, comparison = comparison, findings = ordered, checksRun = checks,
             verdict = verdict, standingLimitations = VerdictEngine.STANDING_LIMITATIONS,
         )
     }
