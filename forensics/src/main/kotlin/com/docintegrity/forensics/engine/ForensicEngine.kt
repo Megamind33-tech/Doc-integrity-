@@ -6,6 +6,7 @@ import com.docintegrity.forensics.model.Finding
 import com.docintegrity.forensics.model.ToolInfo
 import com.docintegrity.forensics.model.VerdictResult
 import com.docintegrity.forensics.compare.ComparisonEngine
+import com.docintegrity.forensics.image.ImageForensics
 import com.docintegrity.forensics.compare.ComparisonResult
 import com.docintegrity.forensics.compare.PageRenderer
 import com.docintegrity.forensics.compare.ReferenceInput
@@ -123,6 +124,10 @@ class ForensicEngine(private val now: () -> Instant = { Instant.now() }) {
                 ),
             )
         }
+
+        val imgs = ImageForensics.analyze(file, content)
+        findings += imgs.findings
+        checks += "embedded images: JPEG structure, placement over scans, noise consistency"
 
         val sigs = SignatureAnalyzer.analyze(file, rev.revisions, trust.anchors, trust.description, now())
         findings += sigs.findings

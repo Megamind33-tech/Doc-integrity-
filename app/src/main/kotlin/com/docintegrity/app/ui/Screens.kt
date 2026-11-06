@@ -90,6 +90,9 @@ fun ReportScreen(report: ForensicReport, onClose: () -> Unit, onComparePages: ((
         item { SectionHeader("Document overview") }
         item { OverviewPanel(report) }
 
+        if (onComparePages != null && report.findings.any { it.regions.isNotEmpty() } && report.comparison?.referenceKind.let { it == null || it !in setOf(com.docintegrity.forensics.compare.ReferenceKind.PDF, com.docintegrity.forensics.compare.ReferenceKind.IMAGE) }) {
+            item { OutlinedButton(onClick = onComparePages, modifier = Modifier.fillMaxWidth()) { Text("View pages with highlighted regions") } }
+        }
         report.comparison?.takeIf { it.referenceKind != null }?.let { c ->
             item { SectionHeader("File comparison", "Compared with the trusted reference you supplied") }
             item { BytesVersusMeaning(c) }
