@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -70,7 +71,13 @@ fun WorkingScreen(message: String) {
 }
 
 @Composable
-fun ReportScreen(report: ForensicReport, onClose: () -> Unit, onComparePages: (() -> Unit)? = null) {
+fun ReportScreen(
+    report: ForensicReport,
+    onClose: () -> Unit,
+    onComparePages: (() -> Unit)? = null,
+    onExportPdf: (() -> Unit)? = null,
+    onExportJson: (() -> Unit)? = null,
+) {
     LazyColumn(
         Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().testTag("report"),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 12.dp),
@@ -86,6 +93,15 @@ fun ReportScreen(report: ForensicReport, onClose: () -> Unit, onComparePages: ((
             }
         }
         item { VerdictBanner(report.verdict) }
+        item { EvidenceCounts(report) }
+        if (onExportPdf != null || onExportJson != null) {
+            item {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (onExportPdf != null) Button(onClick = onExportPdf, modifier = Modifier.weight(1f)) { Text("Export PDF report") }
+                    if (onExportJson != null) OutlinedButton(onClick = onExportJson, modifier = Modifier.weight(1f)) { Text("Export JSON") }
+                }
+            }
+        }
 
         item { SectionHeader("Document overview") }
         item { OverviewPanel(report) }
@@ -140,6 +156,26 @@ fun ReportScreen(report: ForensicReport, onClose: () -> Unit, onComparePages: ((
             items(other, key = { "oth-" + it.id + it.title }) { FindingCard(it) }
         }
 
+        val regionRows = report.findings.flatMap { f -> f.regions.map { f to it } }
+        if (regionRows.isNotEmpty()) {
+            item { SectionHeader("Highlighted regions requiring review", "These are prompts for human review, not proof.") }
+            item {
+                Panel {
+                    regionRows.take(24).forEach { (f, g) ->
+                        Row(Modifier.padding(vertical = 3.dp)) {
+                            Text("p.${g.page + 1}", Modifier.width(34.dp), style = MaterialTheme.typography.labelMedium, color = evidenceColor(f.evidence))
+                            Text(g.label.ifEmpty { f.title }, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                    if (regionRows.size > 24) Text("… ${regionRows.size - 24} more in the exported report", style = MaterialTheme.typography.labelSmall)
+                    if (onComparePages != null) {
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedButton(onClick = onComparePages, modifier = Modifier.fillMaxWidth()) { Text("Open pages with highlights") }
+                    }
+                }
+            }
+        }
+
         item { SectionHeader("Limitations") }
         item {
             Panel {
@@ -166,6 +202,16 @@ fun ReportScreen(report: ForensicReport, onClose: () -> Unit, onComparePages: ((
             }
         }
         item { Spacer(Modifier.height(32.dp)) }
+    }
+}
+
+@Composable
+private fun EvidenceCounts(r: ForensicReport) {
+    val by = r.findings.groupingBy { it.evidence }.eachCount()
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        for (e in listOf(EvidenceClass.ESTABLISHED, EvidenceClass.INDICATOR, EvidenceClass.LIMITATION, EvidenceClass.INFO)) {
+            Pill("${by[e] ?: 0} ${e.label.lowercase()}", evidenceColor(e))
+        }
     }
 }
 

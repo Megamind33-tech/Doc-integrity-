@@ -1,6 +1,10 @@
 package com.docintegrity.app
 
 import android.os.Bundle
+import android.view.WindowManager
+import android.widget.Toast
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -29,6 +33,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Documents shown here can be identity documents: keep them out of screenshots and the recent-apps thumbnail.
+        window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
         setContent {
             ForensicsTheme {
                 Surface(Modifier.fillMaxSize(), color = androidx.compose.material3.MaterialTheme.colorScheme.background) { Root() }
@@ -43,6 +49,22 @@ class MainActivity : ComponentActivity() {
         // OpenDocument gives read access to exactly the file the user picked; no storage permission is requested.
         val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> if (uri != null) vm.choose(uri) }
         val refPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> if (uri != null) vm.chooseReference(uri) }
+        val scope = rememberCoroutineScope()
+        var pendingDone by remember { mutableStateOf<UiState.Done?>(null) }
+        val savePdf = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri ->
+            val d = pendingDone
+            if (uri != null && d != null) scope.launch {
+                val ok = runCatching { vm.exportPdf(uri, d) }.isSuccess
+                Toast.makeText(this@MainActivity, if (ok) "Evidence report saved" else "Could not save the report", Toast.LENGTH_SHORT).show()
+            }
+        }
+        val saveJson = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+            val d = pendingDone
+            if (uri != null && d != null) scope.launch {
+                val ok = runCatching { vm.exportJson(uri, d) }.isSuccess
+                Toast.makeText(this@MainActivity, if (ok) "Findings saved" else "Could not save the file", Toast.LENGTH_SHORT).show()
+            }
+        }
         val pickPdf = { picker.launch(arrayOf("application/pdf")) }
         val refTypes = arrayOf("application/pdf", "image/*", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
         when (val s = state) {
@@ -63,7 +85,11 @@ class MainActivity : ComponentActivity() {
                     )
                 } else {
                     BackHandler { vm.reset() }
-                    ReportScreen(s.report, onClose = vm::reset, onComparePages = { comparing = true })
+                    ReportScreen(
+                        s.report, onClose = vm::reset, onComparePages = { comparing = true },
+                        onExportPdf = { pendingDone = s; savePdf.launch("forensic-report-${s.report.hashes.sha256.take(8)}.pdf") },
+                        onExportJson = { pendingDone = s; saveJson.launch("forensic-findings-${s.report.hashes.sha256.take(8)}.json") },
+                    )
                 }
             }
         }

@@ -2,6 +2,9 @@ package com.docintegrity.app
 
 import android.app.Application
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.lifecycle.AndroidViewModel
@@ -10,6 +13,10 @@ import com.docintegrity.forensics.compare.ReferenceFile
 import com.docintegrity.forensics.compare.ReferenceInput
 import com.docintegrity.forensics.engine.ForensicEngine
 import com.docintegrity.forensics.engine.ForensicReport
+import com.docintegrity.forensics.report.EvidenceReportPdf
+import com.docintegrity.forensics.report.PageSnapshot
+import com.docintegrity.forensics.report.ReportJson
+import com.docintegrity.forensics.model.Side
 import com.docintegrity.forensics.sig.AndroidTrustAnchors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -87,6 +94,34 @@ class AnalysisViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Renders a page of the examined (or reference) PDF for the comparison view. */
     suspend fun renderPage(pdfBytes: ByteArray, page: Int, widthPx: Int): Bitmap? = withContext(Dispatchers.IO) { renderer.renderBitmap(pdfBytes, page, widthPx) }
+
+    /** Writes the PDF evidence report (with outlined page snapshots) to a location the user chose. */
+    suspend fun exportPdf(uri: Uri, done: UiState.Done) = withContext(Dispatchers.IO) {
+        val snaps = ArrayList<PageSnapshot>()
+        val byPage = done.report.findings.flatMap { it.regions }.groupBy { it.page }
+        for ((page, regs) in byPage.entries.sortedBy { it.key }.take(6)) {
+            for (side in listOf(Side.REFERENCE, Side.SUBMITTED)) {
+                val bytes = if (side == Side.SUBMITTED) done.examined else done.reference ?: continue
+                val mine = regs.filter { it.side == side }
+                if (mine.isEmpty() || (side == Side.REFERENCE && done.report.comparison?.referenceKind != com.docintegrity.forensics.compare.ReferenceKind.PDF)) continue
+                val bmp = renderer.renderBitmap(bytes, page, 800) ?: continue
+                val c = Canvas(bmp)
+                val pen = Paint().apply { color = Color.rgb(179, 38, 30); style = Paint.Style.STROKE; strokeWidth = 3f }
+                for (r in mine) {
+                    val sx = bmp.width / r.pageWidth.toFloat(); val sy = bmp.height / r.pageHeight.toFloat()
+                    c.drawRect((r.x * sx).toFloat() - 3, (r.y * sy).toFloat() - 3, ((r.x + r.w) * sx).toFloat() + 3, ((r.y + r.h) * sy).toFloat() + 3, pen)
+                }
+                val bo = java.io.ByteArrayOutputStream(); bmp.compress(Bitmap.CompressFormat.JPEG, 82, bo); bmp.recycle()
+                snaps.add(PageSnapshot("Page ${page + 1} - ${if (side == Side.SUBMITTED) "examined document" else "trusted original"}, regions outlined", bo.toByteArray()))
+            }
+        }
+        val pdf = EvidenceReportPdf.build(done.report, ReportJson.toJson(done.report), snaps)
+        getApplication<Application>().contentResolver.openOutputStream(uri, "wt")?.use { it.write(pdf) } ?: error("Could not write the report.")
+    }
+
+    suspend fun exportJson(uri: Uri, done: UiState.Done) = withContext(Dispatchers.IO) {
+        getApplication<Application>().contentResolver.openOutputStream(uri, "wt")?.use { it.write(ReportJson.toJson(done.report).toByteArray(Charsets.UTF_8)) } ?: error("Could not write the file.")
+    }
 
     fun reset() { temp.wipeAll(); _state.value = UiState.Idle }
 

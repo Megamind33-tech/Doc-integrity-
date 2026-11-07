@@ -39,6 +39,7 @@ class SignatureScreenTest {
         rule.setContent { ForensicsTheme { ReportScreen(r, onClose = {}) } }
         rule.onNodeWithTag("report").performScrollToNode(hasText("1 · Integrity", substring = true))
         rule.onNodeWithText("1 · Integrity: Cryptographically valid").assertIsDisplayed()
+        rule.onNodeWithTag("report").performScrollToNode(hasText("2 · Certificate", substring = true))
         rule.onNodeWithText("2 · Certificate: Chains to a trusted root").assertIsDisplayed()
         rule.onNodeWithTag("report").performScrollToNode(hasText("does not show that the signed information is true", substring = true))
         rule.onNodeWithText("does not show that the signed information is true", substring = true).assertIsDisplayed()
