@@ -84,7 +84,7 @@ object BenchmarkScenarios {
         Scenario("H2", "H", "H2_signed_then_edited.pdf", "H0 followed by an incremental edit of the name.", Truth.ALTERED, "A_original.pdf", CC, CC,
             "Confirmed by cryptography alone: the signature is valid for the earlier revision and the later one changes page content. The signed version is reconstructed byte-for-byte."),
         Scenario("H3", "H", "H3_signed_then_cosigned.pdf", "H0 plus a legitimate second signature by another signer.", Truth.UNALTERED, "A_original.pdf", NI, NI,
-            "Not flagged: further signatures, form-field and signature-widget additions are permitted changes (matches pyHanko's own analysis). An earlier version of this classifier did flag it; see the commit history."),
+            "Not flagged: further signatures, form-field and signature-widget additions are permitted changes (matches pyHanko's own analysis). An early development version of this classifier did flag it, because annotation resources and the AcroForm dictionary were treated as page content; that is fixed and pinned by a test."),
         Scenario("H4", "H", "H4_signed_self_signed.pdf", "A signed with a self-signed certificate.", Truth.UNALTERED, "A_original.pdf", NI, NI,
             "Valid but identity unproven: reported as self-signed, not as invalid."),
         Scenario("H5", "H", "H5_signed_timestamped.pdf", "A signed with an RFC 3161 signature timestamp.", Truth.UNALTERED, "A_original.pdf", NI, NI,

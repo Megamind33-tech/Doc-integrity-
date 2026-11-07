@@ -477,7 +477,7 @@ H0 plus a legitimate second signature by another signer. *(Ground truth: content
 * [Information] **File bytes differ, but no difference in meaning was found** — SHA-256 differs from the supplied original, yet extracted text, names, dates, amounts, document numbers and embedded pictures all match; 0 rendered-page region(s) differ.
 * *Original comparison improves the result:* **no change in outcome**.
 
-> **Assessment.** Not flagged: further signatures, form-field and signature-widget additions are permitted changes (matches pyHanko's own analysis). An earlier version of this classifier did flag it; see the commit history.
+> **Assessment.** Not flagged: further signatures, form-field and signature-widget additions are permitted changes (matches pyHanko's own analysis). An early development version of this classifier did flag it, because annotation resources and the AcroForm dictionary were treated as page content; that is fixed and pinned by a test.
 
 ### H4 — `H4_signed_self_signed.pdf`
 

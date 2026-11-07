@@ -88,6 +88,6 @@ tools/fixtures   fixture generators      docs/   detection notes and benchmark
 ## Known limits (summary)
 
 * Microsoft Word was not available when this was built: Word round trips were produced with LibreOffice. Word-specific tool labels are tested at string level.
-* The APK was built, installed-checked with the SDK tools and its UI exercised with Robolectric (including real rendered screenshots), but **no emulator or device was available**, so `PdfRenderer` page rendering and the R8 release build were not executed on Android.
+* The APK was built and inspected with the SDK tools (`aapt2` permissions, `apksigner`), and its UI was exercised with Robolectric (including real rendered screenshots), but it was **never installed or run**: no emulator or device was available. `PdfRenderer` page rendering, the SAF pickers/exports and the R8 release build were therefore not executed on Android.
 * Without a trusted original, edits that leave no structural trace (a name or amount changed in a Word round trip, a regenerated PDF, a same-quality re-saved scan, a validly signed false document) cannot be detected. See the benchmark.
 * The benchmark is small and author-constructed: it shows what each mechanism can and cannot see, not accuracy rates.
