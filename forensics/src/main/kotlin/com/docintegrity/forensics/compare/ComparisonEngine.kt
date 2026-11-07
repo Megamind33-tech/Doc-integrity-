@@ -450,7 +450,7 @@ object ComparisonEngine {
             out.add(
                 Finding(
                     id = "CMP_ENTITY_${t.name}", area = Area.COMPARISON, evidence = EvidenceClass.ESTABLISHED,
-                    title = "${t.label}${if (ds.size == 1) "" else "s"} differ from the original (${ds.size})",
+                    title = if (ds.size == 1) "${t.label} differs from the original" else "${t.label}s differ from the original (${ds.size})",
                     detected = ds.take(MAX_LISTED).joinToString("\n") { d ->
                         val lab = d.label?.let { "$it: " } ?: ""
                         when (d.kind) {
@@ -564,7 +564,7 @@ object ComparisonEngine {
             out.add(
                 Finding(
                     id = "CMP_ISSUER_MISMATCH", area = Area.COMPARISON, evidence = EvidenceClass.ESTABLISHED,
-                    title = "${bad.size} field${if (bad.size == 1) "" else "s"} disagree with the issuer record",
+                    title = if (bad.size == 1) "1 field disagrees with the issuer record" else "${bad.size} fields disagree with the issuer record",
                     detected = bad.joinToString("\n") { r -> "${r.field}: record says “${r.expected}”; document " + if (r.found.isEmpty()) "does not contain it" else "shows " + r.found.joinToString { "“$it”" } },
                     establishes = "A value in the document differs from the value in the verified issuer record you supplied.",
                     unknown = "Whether the record was entered correctly and is current. The document may predate an update. $UNVERIFIED",
@@ -575,7 +575,7 @@ object ComparisonEngine {
             out.add(
                 Finding(
                     id = "CMP_ISSUER_MATCH", area = Area.COMPARISON, evidence = EvidenceClass.INFO,
-                    title = "${good.size} field${if (good.size == 1) "" else "s"} agree with the issuer record",
+                    title = if (good.size == 1) "1 field agrees with the issuer record" else "${good.size} fields agree with the issuer record",
                     detected = good.joinToString("; ") { "${it.field}: “${it.expected}”" },
                     establishes = "These values appear in the document exactly as in the issuer record.",
                     unknown = "That the rest of the document is unchanged, or that the record itself is accurate. $UNVERIFIED",

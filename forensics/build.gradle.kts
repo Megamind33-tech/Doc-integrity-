@@ -20,6 +20,10 @@ android {
         unitTests {
             isIncludeAndroidResources = true
             isReturnDefaultValues = true
+            all { t ->
+                // lets `-Dbenchmark.write=true` reach the forked test JVM
+                System.getProperty("benchmark.write")?.let { v -> t.systemProperty("benchmark.write", v) }
+            }
         }
     }
 }
